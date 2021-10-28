@@ -1,0 +1,280 @@
+---
+title: "Homework 4"
+author: "Brandon Lucio"
+date: "09/28/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+suppressPackageStartupMessages(library(tidyverse))
+library(corrplot)
+library(olsrr)
+library(car)
+```
+
+## Not from the text book
+
+A data set provides selected county demographic information (CDI) for 440 of the most populous counties in the United States. Each line of the data set has an identification number with a county name and state abbreviation and provides information on 14 variables for a single county. Counties with missing data were deleted from the data set. The information generally pertains to the years 1990 and 1992. The 17 variables are given in Table 1. An R data (CDI_data.rda) is included. You can put it into your homework file directory and use readRDS("CDI_data.rda") to load the data.
+
+```{r}
+CDI <- readRDS("CDI_data.rda")
+```
+
+### Problem 1
+
+The number of active physicians ($Y$) is to be regressed against total population ($X_1$), total personal income ($X_2$), and geographic region ($X_3,X_4,X_5$) that will be defined next.
+
+a.  Fit a first-order regression model. Let $X_3 = 1$ if **NE** and 0 otherwise. $X_4=1$ if **NC** and 0 otherwise, and $X_5=1$ if S and 0 otherwise. Comment on your results.
+
+```{r}
+# Creating dummy variables
+CDI$X3 <- ifelse(CDI$Region == 1, 1 ,0) # NE
+CDI$X4 <- ifelse(CDI$Region == 2, 1 ,0) # NC
+CDI$X5 <- ifelse(CDI$Region == 3, 1 ,0) # S
+```
+
+```{r}
+Physicians.Model <- lm(NumPhysicians ~ TotalPop + TotalPIncome + X3 + X4 + X5, 
+                       data = CDI)
+summary(Physicians.Model)
+```
+
+Thanks to our dummy variables we can see that we have 4 different models for each region. Given by:
+
++---------------+-------------------------------------------------------------------+
+| Region        | Model( $y_i$ )                                                    |
++:=============:+:=================================================================:+
+| North East    | -207.496 + 0.000551( TotalPop ) +0.107( TotalPIncome ) + 149.0196 |
++---------------+-------------------------------------------------------------------+
+| North Central | -207.496 + 0.000551( TotalPop ) +0.107( TotalPIncome ) + 145.5264 |
++---------------+-------------------------------------------------------------------+
+| South         | -207.496 + 0.000551( TotalPop ) +0.107( TotalPIncome ) + 191.2163 |
++---------------+-------------------------------------------------------------------+
+| West          | -207.496 + 0.000551( TotalPop ) +0.107( TotalPIncome )            |
++---------------+-------------------------------------------------------------------+
+
+This shows that the West region has the lowest active physicians compared to the other regions. The South has 191 more, North Central with 146 more, and North East with 149 more. We also see that the overall test of a relationship gives a p-value of essentially 0. This means that at least one of the predictors. The adjusted $R^2$ is 0.8999 this means that about 90% of the variability in Y can be explained by the predictors.
+
+b.  Use a level of significance $\alpha = 0.10$ to test whether any geographic effects are present. State the alternatives, decision rule, and conclusion. What is the p-value of the test?
+
++---------------+------------------+----------+-----------------+-------------------------------------------------------+
+| Regressor     | Alternative      | P-Value  | Decision Rule   | Conclusion                                            |
++:=============:+:================:+:========:+:===============:+:=====================================================:+
+| North East    | $\beta_3 \neq 0$ | 0.08685  | P-value \< 0.10 | X3 is significant if all other variables are constant |
++---------------+------------------+----------+-----------------+-------------------------------------------------------+
+| North Central | $\beta_4 \neq 0$ | 0.08817  | P-value \< 0.10 | X4 is significant if all other variables are constant |
++---------------+------------------+----------+-----------------+-------------------------------------------------------+
+| South         | $\beta_5 \neq 0$ | 0.01731  | P-value \< 0.10 | X5 is significant if all other variables are constant |
++---------------+------------------+----------+-----------------+-------------------------------------------------------+
+
+### Problem 2
+
+A public safety official wishes to predict the rate of serious crimes (Y , total number of serious crimes per 100,000 population, i.e., you need to recalculate the response here). The pool of potential predictor variables includes all other variables in the data set except total population, total serious crimes, county, state, and region. It is believed that a model with predictor variables in first-order terms with no interaction terms will be appropriate. Consider the even-numbered cases to constitute the model-building data set to be used for the following analyses.
+
+```{r}
+CDI2 <- readRDS("CDI_data.rda") %>% mutate(Y = TotCrimes/(TotalPop/100000))
+CDI2<- CDI2[,-c(1,2,3,5,10,17)]
+model <- lm(Y ~., data = CDI2)
+```
+
+a.  Obtain the scatter plot matrix. Also obtain the correlation matrix of the $X$ variables. Is there evidence of strong linear pairwise associations among the predictor variables here?
+
+```{r}
+pairs(CDI2, panel = panel.smooth)
+corrplot(cor(CDI2), method = 'shade', order = 'AOE', diag = FALSE)
+```
+
+-   From the scatterplot we can see some linear relationships between PercentHSGrad: PercentColDeg, PercentBelowPov, PercentUnemploy. This relationship is given more strength when looking at the correlation matrix, with correlation coefficients of 0.707, -0.692, -0.594. NumPhysicians and NumHospitalBeds also have a high correlation at 0.950.
+
+b.  Use several model selection techniques to pick up models and comment on them. If there are multiple candidates, pick one you deem attractive.
+
+```{r Forward Selection }
+#Forward Selection
+ols_step_forward_p(model, penter = 0.05)
+```
+
+```{r Backward Selection}
+#Backward Selection
+ols_step_backward_p(model, prem = 0.1)
+```
+
+```{r Both}
+# Both 
+ols_step_both_p(model, pent = 0.05, prem = 0.1 )
+```
+
+As the backward selection model has a more predictors I picked this model to move forward with. This should in general lead to a higher $R^2$
+
+c.  Use the model you picked in part (b) above and run a regression of that model for the odd-numbered cases (test data). Compare the estimated regression coecients and their estimated standard deviations of odd-numbered case data with those in the model you obtained in part (b). In addition, compare the error mean squares and coecients of multiple determination. Does the model fitted to the test data set yield similar estimates as the model fitted to the model-building data set?
+
+```{r}
+# Getting only odd numbered cases as test data
+test_CDI2 <- CDI2[c(TRUE, FALSE),-c(1,3,6,7,11)]
+train_CDI2 <- CDI2[!c(TRUE, FALSE),-c(1,3,6,7,11)]
+
+model.test <- lm(Y ~., data = test_CDI2)
+summary(model.test)
+
+model.full <- lm(Y ~., data = CDI2[,-c(1,3,6,7,11)])
+summary(model.full)
+```
+
+From the summary outputs we can see that test model has similar results for the coefficients for the predictors except for PercentPopYoung and PercentUnemploy
+
+d.  Now use the odd-numbered cases as test (validate) data and fit your model part (b) with training data set (even-numbered cases). Calculate the MSE of the predictions to the test data and compare it to MSE of the predictions to training data set. Is there evidence of a substantial bias problem in MSE here?
+
+```{r}
+# Fitting model with training data set
+model.train <- lm(Y ~., data = train_CDI2)
+
+# Computing the training MSE 
+MSE.Training <- mean((model.train$residuals)^2)
+
+# Testing MSE
+data <- data.frame(pred = predict(model.train, , newdata = test_CDI2),actual = test_CDI2$Y )
+
+MSE.Test <- mean((data$actual-data$pred)^2)
+
+sprintf("Training MSE: %.f",MSE.Training)
+sprintf("Test MSE: %.f",MSE.Test)
+```
+
+The test MSE is larger than the Training as to be expected. As such there does not seem to a substantial bias problem.
+
+e.  Finally, fit the selected regression model to the combined training and test data sets. Are the estimated regression coefficients and their estimated standard deviations appreciably different from those for the model fitted to the training data set? Should you expect any differences in the estimates? Explain.
+
+```{r}
+summary(model.full)
+summary(model.train)
+```
+
+The two different models do have noticeable differences when it comes to the regression coefficients and their estimated standard deviations. I do think we would expect differences if this was done with different data as we are adding more data to the model which would give different values.
+
+### Problem 3
+
+Now consider the regression model, with total crime (per 100,000) as response and the variables 6, 8, 9, 13, 14, and 15 as predictors, in first-order terms is to be evaluated in detail based on the training data set (even-numbered cases).
+
+```{r}
+CDI3 <- readRDS("CDI_data.rda") %>% mutate(Y = TotCrimes/(100000))
+CDI3<- CDI3[,c(6,8,9,13,14,15,18)]
+train_CDI3 <- CDI3[!c(TRUE, FALSE),] # Selecting Even observations for training
+
+model.3 <- lm(Y ~., data = train_CDI3 )
+summary(model.3)
+```
+
+a.  Obtain the residuals and plot them separately against Y , each predictor variable in the model, On the basis of these plots, should any modifications in the model be made?
+
+```{r}
+ols_plot_resid_fit(model.3)
+```
+
+```{r}
+par(mfrow = c(2,3))
+plot(y = resid(model.3), x = train_CDI3$PercentPopYoung )
+plot(y = resid(model.3), x = train_CDI3$NumPhysicians )
+plot(y = resid(model.3), x = train_CDI3$NumHospitalBeds)
+plot(y = resid(model.3), x = train_CDI3$PercentBelowPov )
+plot(y = resid(model.3), x = train_CDI3$PercentUnemploy )
+plot(y = resid(model.3), x = train_CDI3$PerCapitaIncome )
+```
+
+-   There do seem to be some outliers but the biggest issue seems to be from NumPhysicians and NumHospitalBeds. They seem to have nonconstant variance and similar residuals. More investigation should be done to rule out multicollinearity.
+
+b.  Do a normal probability plot of the residuals and test for normality at a significance level of 0.10.
+
+```{r}
+ols_plot_resid_qq(model.3)
+```
+
+```{r}
+ols_test_normality(model.3)
+```
+
+At $\alpha =0.10$ we can see that the residuals are essentially normally distributed.
+
+c.  Obtain the scatter plot matrix, the correlation matrix of the X variables, and the variance inflation factors. Are there any indications that serious multicollinearity problems are present? Explain.
+
+```{r}
+pairs(train_CDI3, panel = panel.smooth)
+corrplot(cor(train_CDI3) ,method = 'shade', order = 'AOE', diag = FALSE)
+vif(model.3)
+```
+
+-   From the vif, scatterplot, and correlation matrix we can see that NumPhyscians and NumHospitalBeds have high values of VIF ( > 8 ) this indicates that these two values have collinearity.
+
+d)  Obtain the studentized deleted residuals and prepare a dot plot of these residuals. Are any outliers present? Use the Bonferroni outlier test (in R, use outlierTest in the *car* package) procedure with $\alpha = 0.05$. State the decision rule and conclusion.
+
+```{r}
+ols_plot_resid_stud_fit(model.3)
+```
+
+```{r}
+outlierTest(model.3, cutoff = 0.05)
+```
+
+The Bonferroni Outlier Test uses a t-test to test whether the model's largest studentized residual value's outlier status is statistically different from the other observations in the model. If the Bonferroni p-value \< 0.05 then we reject the null hypothesis: the point is not different from the other observations, and conclude that observation 6 is indeed an outlier of the rest of the data. The graph shows that observation 6 should also be considered an outlier.
+
+d)  Obtain the diagonal elements of the hat matrix. Using the rule of thumbs described in the notes, identify any outlying X observations.
+
+    -   The rule of thumb is $h_{ii} > \frac{2(p+1)}{n}$
+
+```{r}
+hat.model.3 <- hatvalues(model.3);
+
+# Using the rule of thumb we can see that the following are potential outliers
+hat.model.3[hat.model.3 > 2*(ncol(train_CDI3))/nrow(train_CDI3)]
+```
+
+d)  Cases 2, 8, 48, 128, 206, and 404 are outlying with respect to their X values, and Cases 2 and 6 are reasonably far outlying with respect to their Y values. Obtain **DFFITS**, **DFBETAS**, and **Cook's distance** values for these cases to assess their influence. What do you conclude?
+
+**DFFITS**: Measure of influence on a single fitted value. Given by the formula
+
+$$
+(DFFITS)_i=\frac{\hat Y_i - \hat Y_{i,-i}}{\sqrt{MSE_{-i}h_{ii}}} = t_i\sqrt{\frac{h_{ii}}{1-h{ii}}}
+$$
+
+Decision ROT: $(DFFITS)_i$ \> 1 for small to medium data sets and \> $2\sqrt{(p+1)/n}$ for large data sets.
+
+```{r}
+cases <- c('2','6','8','48','128','206','404')
+# DFFITS
+dffits(model.3)[cases]
+```
+
+**DFBETAS**: Measure of influence of case *i* on each $\hat \beta_j$ . Given by$$
+(DFBETAS)_{j,-i} = \frac{\hat \beta_j - \hat \beta_{j,-i}}{\sqrt{MSE_{-i}c_{jj}}}
+$$ where $c_{jj}$ is the jth diagonal element of $(X^TX)^{-1}$
+
+Decision ROT: $DFBETAS$ \> 1 for small to medium data and \> $2/\sqrt{n}$ for large data.
+
+```{r}
+# DFBETAS
+dfbeta(model.3)[cases,]
+```
+
+**Cook's Distance**: Measure of influence on all fitted values, given by
+
+$$
+D_i = \frac{\sum_{j=1}^{n}{(\hat Y_j - \hat Y_{j,-1})^2}}{(p+1)MSE} = \frac{e_i^2}{(p+1)MSE}\left[\frac{h_{ii}}{(1-h_{ii})^2}\right]
+$$
+
+$D_i$ is related to $F_{p+1,n-p-1}$
+
+ROT: Alert when cdf of $F_{p+1,n-p-1}$ is larger than 50%
+
+```{r}
+# Cooks Distance
+cooks.distance(model.3)[cases]
+```
+
+Now applying all the decision rules we get
+
+```{r}
+dffits(model.3)[which( abs(dffits(model.3)) > 1 )]
+
+dfbeta(model.3)[which( abs(dfbeta(model.3)) > min(1,2/sqrt(nrow(train_CDI3))) ),]
+```
+
+Thus we can conclude that observations 2 and 6 are outliers.

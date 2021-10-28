@@ -1,0 +1,319 @@
+---
+title: "Homework 2"
+author: "Brandon Lucio"
+date: "8/26/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(MASS)
+library(cowplot)
+```
+
+# From Textbook
+
+#### Question 1
+
+Indicate whether we would generally expect the performance of a **flexible** statistical learning method to be better or worse than an **inflexible** method. Justify your answer.
+
+a)  The sample size n is extremely large, and the number of predictors p is small.
+
+    -   Since we have an extremely large sample size we can estimate the small number of predictors. The flexible statistical learning method can be used.
+
+b)  The number of predictors p is extremely large, and the number of observations n is small.
+
+    -   With the large number of predictors using a flexible model would not be better than inflexible because the error would be larger
+
+c)  The relationship between the predictors and response is highly non-linear.
+
+    -   Since our relationship is non-linear, it would be best to use a flexible model, we would get a non-line fit
+
+d)  The variance of the error terms, i.e. $\sigma^2 = Var(\epsilon)$ , is extremely high.
+
+    -   With a higher variance in the error term using the flexible model would risk more error from just random noise. Thus, using an inflexible method would be best.
+
+#### Question 2
+
+Explain whether each scenario is a classification or regression problem, and indicate whether we are most interested in inference or prediction. Finally, provide n and p.
+
+a)  We collect a set of data on the top 500 firms in the US. For each firm we record profit, number of employees, industry and the CEO salary. We are interested in understanding which factors affect CEO salary.
+
+    -   This is more of a regression problem as we have more quantitative predictors. The overall interest is in the inference of what factors affect the CEO salary. n = 500 , p = 3
+
+b)  We are considering launching a new product and wish to know whether it will be a success or a failure. We collect data on 20 similar products that were previously launched. For each product we have recorded whether it was a success or failure, price charged for the product, marketing budget, competition price, and ten other variables.
+
+    -   Here we are solving a classification problem but overall more interested in the prediction of which class we want in the end. n = 20, p = 13
+
+c)  We are interested in predicting the % change in the USD/Euro exchange rate in relation to the weekly changes in the world stock markets. Hence we collect weekly data for all of 2012. For each week we record the % change in the British market, and the % change in the German market.
+
+    -   This is a regression problem as we are trying to predict the % change. n = 52, p = 3
+
+#### Question 3
+
+We now revisit the bias-variance decomposition.
+
+a)  Provide a sketch of typical (squared) bias, variance, training, error, test error, and Bayes (or irreducible) error curves, on a single plot, as we go from less flexible statistical learning methods towards more flexible approaches, The x-axis should represent the amount of flexibility in the method , and the y-axis should represent the values for each curve. There should be five curves. Make sure to label each one.
+
+    ![](SmartSelect_20210913-170420_Samsung%20Notes.jpg)
+
+b)  Explain why each of the five curves has the shape displayed in part (a)
+
+    -   As we increase in flexibility the model then we are using more and more parameters which would increase the variance of each error. At the same time the Bias would decrease as the flexibility goes up since we are matching the data closer and closer. Now the test MSE has an interesting U-shape. it starts off high and then goes down as flexibility increases but then at a point it starts to go up again since we begin to over estimate and gain more error. The training MSE is usually always lower than the Test MSE and will consistently decrease as the Flexibility increases.
+
+#### Question 10
+
+This exercise involves the **Boston** housing data set.
+
+a)  To begin, load in the **Boston** data set. The **Boston** data set is part of the **Mass** library in **R**. How many rows are in this data set? How many columns? What do the rows and columns represent?
+
+```{r}
+#How many rows?
+sprintf('The number of rows: %d', nrow(Boston))
+#How many columns?
+sprintf('The number of columns: %d', ncol(Boston))
+#What do the rows and columns represent?
+#Housing values in suburbs of Boston
+```
+
+b)  Make some pairwise scatter-plots of the predictors(columns) in this data set. Describe your findings.
+
+```{r}
+pairs(Boston, panel = panel.smooth)  
+
+```
+
+We can see that there are quite a few trends to be seen here. lstat and medv have some type of relationship. But as age changes rm tends to stay relatively the same. lstat also tends to increase as age goes up.
+
+c)  Are any of the predictors associated with per capita crime rate? If so, explain the relationship.
+
+    -   Yes, we can see that as age increases we can see higher crime rates. Also homes with a lower medv comes higher crime rates.
+
+d)  Do any of the suburbs of Boston appear to have particularly high crime rates? Tax rates? Pupil-teacher rations? Comment on the range of each predictor.
+
+    The best way to get a rough idea of high rates ( outliers ) is with some type of visual
+
+    ```{r fig.show="hold", out.width="33.33%"}
+    # Here we use box plots
+    ggplot(Boston, mapping = aes(x = '', y = tax)) +
+      geom_boxplot() +
+      theme_minimal() +
+      ggtitle('Tax')
+
+    ggplot(Boston, mapping = aes(x = '', y = crim)) +
+      geom_boxplot() +
+      theme_minimal() +
+      ggtitle('Crime Rate')
+
+    ggplot(Boston, mapping = aes(x = '', y = ptratio)) +
+      geom_boxplot() +
+      theme_minimal() +
+      ggtitle('Teacher Ratio')
+    ```
+
+    ```{r}
+    # You can also pull out potential outliers index with the $out function 
+    # From the images we see that tax does not have any outliers so we omit it
+    crime_out <- boxplot.stats(Boston$crim)$out
+    pt_out <- boxplot.stats(Boston$ptratio)$out
+
+    # Now using the which() function we can get the exact rows to verify
+    # We comment out to avoid printing
+    # Boston[which(Boston$crim %in% c(crime_out)),]
+    # Boston[which(Boston$ptratio %in% c(pt_out)),]
+    ```
+
+e)  How many of the suburbs in this data set bound the Charles river?
+
+    ```{r}
+    # Start by filtering data for the indicator variable
+    # Then getting the nrows in that new dataframe
+    sprintf('There are %d suburbs bound by the Charles river',nrow(filter(Boston, chas == 1)))
+    ```
+
+f)  What is the median pupil-teacher ratio among the towns in this data set?
+
+    ```{r}
+    median(Boston$ptratio)
+    ```
+
+g)  Which suburb of Boston has lowest median value of owner-occupied homes? What are the values of the other predictors for that suburb, and how do those values compare to the overall ranges for those predictors? Comment on your findings.
+
+    ```{r}
+    Boston[which(Boston$medv == min(Boston$medv)),]
+    ```
+
+    -   These suburbs also have higher crime rates, tax, ptratio, and black being at the 3rd quartile. They also have the max age of the suburbs. This shows that the homes with the lowest values are the oldest, suggesting that age of the home has a big effect on its value.
+
+h)  In this data set, how many of the suburbs average more than seven rooms per dwelling? More than eight rooms per dwelling? Comment on the suburbs that average more than eight rooms per dwelling.
+
+    ```{r}
+    sprintf('There are %d subrbs with more than 7 rooms.', nrow(filter(Boston, rm > 7)))
+    sprintf('There are %d subrbs with more than 8 rooms.', nrow(filter(Boston, rm > 8)))
+
+    # Boston[which(Boston$rm > 8),]
+    ```
+
+    -   The crime rate for these dwellings is less then the mean crime rate of all suburbs. We can also see that tax and ptratio are also lower than the mean value per suburb.
+
+# Not from text book
+
+1.  Suppose you have the following functions. Write an R function to each of them and then make a plot for each one
+
+    a)  $f(x) = 2 + 3x^2 -x$, in the range of $(-10,10)$.
+
+    ```{r fig.show="hold", out.width="50%"}
+    # we can do this a couple of different ways
+    # First, using the curve method
+    f_a <- function(x){ return(2 + 3*x^2 - x)}
+    curve(expr = f_a, from = -10, to = 10)
+    # Second, using ggplot
+    ggplot(data.frame(x = c(-10,10)), aes(x = x )) + 
+      stat_function(fun = f_a) +
+      theme_cowplot()
+    ```
+
+    b)  $f(x) = \frac{1}{B(2,3)}x(1-x)^2$, for $0<x<1$, where $B(\alpha, \beta)$ is a beta function, in the range of $(0,1)$
+
+    ```{r fig.show="hold", out.width="50%"}
+    #Similarly as part a 
+    f_b <- function(x){ return((1/ beta(2,3))* x * (1-x)^2)}
+    curve(expr = f_b, from = 0, to = 1)
+    ggplot(data.frame(x = c(0,1) ), aes(x = x )) + 
+      stat_function(fun = f_b) +
+      theme_cowplot()
+    ```
+
+2.  Create a data frame with the following command\
+    \>set.seed(123)\
+    \>df = data.frame(x1 = rnorm(10), x2 = rpois(10,3), x3 = runif(10,-1,1), x4= rgamma(10,2,3))
+
+<!-- -->
+
+a)  Obtain the means of all columns using apply
+
+```{r}
+set.seed(123)
+df = data.frame(x1 = rnorm(10), x2 = rpois(10,3), x3 = runif(10,-1,1), x4= rgamma(10,2,3))
+apply(df, 2, mean)
+
+```
+
+b)  Add another column, named c5, which is 1 for all $x1 \ge 0$ and 0 otherwise.
+
+```{r}
+# Creating new column with mutate
+df = mutate(df,c5 = ifelse(x1 >= 0 , 1 , 0 ))
+```
+
+c)  Draw boxplots of $x2$ for different c5 values
+
+```{r}
+boxplot(x2 ~ c5, data = df)
+```
+
+3.  In this problem, you search the internet using "auto_mpg dataset" to find an automobile mpg data. Most likely you would be able to find it in either at "kaggle", or "UCI Machine Learning Repository" Note that you do not use the original data.
+
+<!-- -->
+
+a)  Create a new project and import the data into your RStudio. Show the first 3 rows of the data by using *head* command.
+
+    ```{r}
+    auto_mpg <- read.csv('c:/users/lucio/OneDrive/School/STA-6923-Data_Mining/Homework/Homework_2/auto-mpg.csv')
+    head(auto_mpg, 3)
+    ```
+
+b)  Check the classes of your variable by using the *sapply* command. What are the classes of **horsepower**, **model_year** and **name**?
+
+    ```{r paged.print=TRUE}
+    sapply(auto_mpg, class)
+    ```
+
+    -   We can see that Horsepower: character, model_year: integer, name: character
+
+c)  From the original data, **horsepower** is supposed to be numeric. Do you see any problem? in R, any missing value is labeled as "NA". Try to clean the data(actually the **horsepower** column) and replace any character to "NA".
+
+    ```{r}
+    auto_mpg$horsepower <-ifelse(auto_mpg$horsepower == '?', NA,auto_mpg$horsepower)
+    auto_mpg$horsepower <- as.numeric(auto_mpg$horsepower)
+    ```
+
+d)  Do a summary analysis of the data (numeric variables) by checking each variable's range, extreme values, mean, median, standard deviation, etc. Check the correlations among the variables and plot pairwise graph between each two variables by using command *pairs*.
+
+    ```{r paged.print=TRUE}
+    summary(auto_mpg[which(sapply(auto_mpg, is.numeric))])
+    pairs(auto_mpg[which(sapply(auto_mpg, is.numeric))])
+    ```
+
+e)  Create a two-variable data, with only *acceleration* and *mpg* in it. Make a scatter plot between them by using *mpg* as y-axis variable. Do you see strong correlation between the two variables? In addition, what is a correlation?
+
+    ```{r}
+    a_mpg <- dplyr::select(auto_mpg, mpg, acceleration)
+    a_mpg %>%
+      ggplot(mapping = aes(x = acceleration, y = mpg)) +
+      geom_point()
+    ```
+
+    -   Correlation refers to the measure of the linear relationship between X and Y. From the graph I do not see a strong correlation between acceleration and mpg.
+
+f)  Run a linear regression between the variables in part e) and use *mpg* as the response variable, *acceleration* as the predictor. What's your conclusion for this analysis? In addition, add the regression line to the plot in part e).
+
+    ```{r}
+    lm.model = lm(mpg~ acceleration, data = a_mpg)
+    summary(lm.model)
+    ```
+
+    ```{r}
+    a_mpg %>%
+      ggplot(aes(x = acceleration, y = mpg)) +
+      geom_point() +
+      geom_smooth( formula = y ~ x ,method = 'lm')
+    ```
+
+g)  Using the regression in part f), make a prediction of *mpg* for each *acceleration* values in the data. Draw a scatter plot between the original *mpg* and the predicted *mpg*. Comment.
+
+    ```{r}
+    a_mpg$predicts <- predict(lm.model,  , newdata =data.frame(a_mpg['acceleration']))
+    a_mpg %>%
+      ggplot(aes(x = mpg , y =predicts)) +
+      geom_point() 
+
+    ```
+
+h)  **MSE** is an abbreviation for **Mean Squared Error**, which is the average of the squared differences between the estimated and the truth value (or observed value). For the results in part g), treat the original *mpg* as true values, and predicted *mpg* as estimates. Find the **MSE** of this prediction.
+
+    ```{r}
+    # We have two ways to calculate the MSE
+    print( mean((a_mpg$mpg-a_mpg$predicts)^2) )
+    print(mean(lm.model$residuals^2))
+    ```
+
+i)  The Locally Estimated Scatterplot Smoothing, or LOESS, is a moving regression to fit data more smoothly. Use the **loess** function in R to make a LOESS regression between *acceleration* and *mpg*. What is the MSE of the prediction in this case? Comment, including the results in part h). Add the LOESS regression line into the graph you drew for part h)
+
+    ```{r}
+    loess.model <- loess(formula = mpg~ acceleration, data = a_mpg )
+    print(mean(loess.model$residuals^2))
+    ```
+
+    ```{r}
+    a_mpg %>%
+      ggplot(aes(x = acceleration, y = mpg)) +
+      geom_point() +
+      geom_smooth( formula = y ~ x ,method = 'lm') +
+      geom_smooth( formula = y ~ x ,method = 'loess', color = 'green' )
+    ```
+
+j)  Using **summary** to check the result of your LOESS regression in part i). The **span**, in the *Control settings*, is a smoothing parameter. Now try to run another (or more if you like) LOESS regression by adding **span** option in your loess command. Comment on the results
+
+    ```{r}
+    for (i in seq(.1,1,.05)){
+        model <- loess(mpg ~ acceleration, data = a_mpg, span = i)
+        print(paste("Span:", sprintf("%.2f",i) , "MSE:", 
+              round(mean(model$residuals^2),4)), quote = FALSE)
+    }
+    ```
+
+    -   Running through multiple values of span using anything lower than span = .1 gives a small error but at .1 we get a smaller MSE of 42.0865 gradually getting higher as the span gets bigger.
